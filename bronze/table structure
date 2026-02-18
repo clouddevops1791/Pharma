@@ -1,0 +1,370 @@
+drop table if exists Silver.ProductCycle;
+create table Silver.ProductCycle(
+		pk int,
+		pdid int,
+		pdname varchar(50),
+		diseses varchar(50),
+		reg_event varchar(50),
+		eventlagtime int,
+		therapy varchar(50),
+		producttype varchar(50),
+		sellingP numeric(10,2),
+		shelflife int,
+		status varchar(50),
+		pdlaunchdate date,
+		regulatorydate date,
+		mktsegment varchar(50),
+		event_cost numeric(10,2),
+		Grossmargintarget numeric(10,2) 
+
+);
+
+---inserting table into silver structured table--
+insert into Silver.ProductCycle(
+		pk ,
+		pdid ,
+		pdname ,
+		diseses ,
+		reg_event ,
+		eventlagtime ,
+		therapy,
+		producttype ,
+		sellingP ,
+		shelflife ,
+		status ,
+		pdlaunchdate ,
+		regulatorydate ,
+		mktsegment ,
+		event_cost,
+		Grossmargintarget  
+) 	
+	(select
+		row_number() over( order by cr.productid) as pk,
+		cr.productid as pdid,
+		pm.productname as pdname,
+		pm.indication as diseses,
+		cr.eventtype   as reg_event,
+		cr.expected_additional_timeline_months as eventlagtime,
+		
+		pm.therapeuticarea as therapy,
+		pm.unit_of_sale  as producttype,
+		pm.price_per_unit as sellingP,
+		pm.expected_life_years as shelflife,
+		pm.current_regulatory_status as status,
+		pm.launch_target_date as pdlaunchdate,
+		cr.eventdate as regulatorydate,
+		pm.marketsegments as mktsegment ,
+		cr.cost_impact as event_cost,
+		
+		pm.gross_margin_target as Grossmargintarget
+
+	from  bronze.clinical_regulatory_events cr
+	
+	left Join  bronze.product_master pm ON cr.productid= pm.productid
+	
+	);	
+			
+	
+	
+---creating and structuring second table---
+-----manufacturing and sales prediction dataset------
+--joining the sales-baseline prediction with the manufacturing production to be able to knit production with realistic outputs and bargains--
+--to enable us reduce waste like wait,over-production ,inventory,Defects--This helps us not just produce with static schedules but aligning it --
+--facts and reality on ground like the market penetration,market share,uptake market curve,predictions which helps realistically manage production and--
+--inventory of which gained profits is subsequently is directed to interest repayment ,a win - win for the company----
+
+drop table if exists Silver.Manufacturingdata;
+
+create table Silver.Manufacturingdata(
+	productid int,
+	
+	
+	regionid INT,
+	manu_date date,
+	revenue_baseline numeric(10,2),
+	forecats_date date,
+	units_sold_baseline int,
+	price_per_unit numeric(10,2),
+	market_share_assumption numeric(10,2),
+	penetration_rate numeric(10,2),
+	uptake_curve_label varchar(50),
+
+	 planned_batches int,
+	 batch_cost numeric(10,2),
+	
+	 inventory_qty  int,
+	 manu_readiness_cost  numeric(10,2),
+	 carry_cost_per_month numeric(10,2)	
+
+);
+
+---inserting manipulated joins into table---
+
+insert into silver.manufacturingdata(
+	productid ,
+	
+	
+	regionid ,
+	manu_date,
+	revenue_baseline ,
+	forecats_date ,
+	units_sold_baseline ,
+	price_per_unit ,
+	market_share_assumption ,
+	penetration_rate ,
+	uptake_curve_label ,
+
+	 planned_batches ,
+	 batch_cost ,
+	
+	 inventory_qty ,
+	 manu_readiness_cost ,
+	 carry_cost_per_month )
+	 
+With Aggre_manu as
+	 (select 
+
+	ms.productid ,
+	ms.price_per_unit as manu_price,
+	
+	(ms.planned_batches) as plannedbatches,
+	(ms.batch_cost) as batchcost,
+	
+	(ms.inventory_buildup_qty) as inventory_buildup_qty,
+	(ms.manufacturing_readiness_cost) as manu_readiness_cost,
+	(ms.carrying_cost_per_month) as carrying_cost_monthly
+	
+
+from bronze.manufacturing_schedule ms
+group  by ms.productid,ms.price_per_unit,(ms.planned_batches),(ms.batch_cost),(ms.inventory_buildup_qty),(ms.manufacturing_readiness_cost),
+(ms.carrying_cost_per_month))
+
+select
+
+	sb.productid,
+	sb.regionid,
+	ms.manu_date,
+
+	sb.revenue_baseline,
+	
+	sb.forecats_date,
+	sb.units_sold_baseline,
+	sb.price_per_unit,
+	sb.market_share_assumption,
+	sb.penetration_rate,
+	sb.uptake_curve_label,
+
+	(ms.planned_batches) as planned_batches,
+	(ms.batch_cost) as batch_cost,
+	
+	(ms.inventory_buildup_qty) as inventory_qty,
+	(ms.manufacturing_readiness_cost) as manu_readiness_cost,
+	(ms.carrying_cost_per_month) as carry_cost_per_month
+	
+
+
+from bronze.manufacturing_schedule ms	
+left join  bronze.sales_forecast_baseline sb on ms.productid=sb.productid
+where (sb.forecats_date-ms.manu_date) <120 and (sb.forecats_date > ms.manu_date)
+group by sb.revenue_baseline,sb.productid	,sb.regionid,
+	ms.manu_date,
+	sb.forecats_date,
+	sb.units_sold_baseline,(ms.planned_batches),(ms.batch_cost),(ms.inventory_buildup_qty),(ms.manufacturing_readiness_cost),
+(ms.carrying_cost_per_month),
+	
+	sb.price_per_unit,
+	sb.market_share_assumption,
+	sb.penetration_rate,
+	sb.uptake_curve_label
+order by productid,ms.manu_date,regionid asc
+
+
+----creating the scenario adjustment table structure for silver layer----
+--data manipulation and wrangling was done to make it fit for use by the silver layer---
+
+drop table if exists Silver.scenario_adjustment;
+create table Silver.scenario_adjustment(
+			scenarioid varchar(20),
+			scenarioname varchar(50),
+			launch_date_adjustment int,
+			probability_of_approval numeric(10,2),
+			sales_penalty_factor numeric(10,2),
+			marketing_spend_reschedule_flag varchar(20)
+);
+
+
+insert into silver.scenario_adjustment(
+			scenarioid ,
+			scenarioname,
+			launch_date_adjustment,
+			probability_of_approval,
+			sales_penalty_factor,
+			marketing_spend_reschedule_flag)
+
+select 
+		scenarioid,
+		scenarioname,
+		launch_date_adjustment,
+		probability_of_approval,
+		sales_penalty_factor,
+		case when marketing_spend_reschedule_flag='0' then 'Y'
+		else  'N'
+		end as marketing_spend_reschedule_flag
+		
+from bronze.scenario_adjustment ;	
+
+----creating the structure of financing schedule----
+--creating table in the silver---
+drop table if exists Silver.Financingschedule
+
+create table Silver.Financingschedule(
+			financingid varchar(20),
+			financedate date,
+			instrument varchar(50),
+			Financingamount numeric (10,2),
+			drawndowndate date,
+			interestrate numeric(10,2),
+			maturitydate date,
+			financingfees numeric(10,2),
+			interestAmount numeric(10,2)
+
+
+);
+
+insert into silver.financingschedule(
+			financingid ,
+			financedate ,
+			instrument ,
+			Financingamount ,
+			drawndowndate,
+			
+			interestrate ,
+			
+			maturitydate ,
+			financingfees ,
+			interestamount 
+)
+
+
+select
+			financingid ,
+			finance_date as financedate ,
+			instrument ,
+			amount as financingamount,
+			drawdown_date as drawdowndate,
+			interest_rate  as interestrate,
+			maturity_date  as maturitydate,
+			fees as financingfees,
+			interest_expense  as interestamount
+
+from bronze.financing_schedule;
+
+
+
+-----rnd_cost  analysis-----
+drop table if exists Silver.rnd_costs;
+
+
+create table Silver.rnd_cost(
+			productid  int,
+			rnd_date date,
+			costtype varchar(20),
+			amount numeric(10,2),
+			capitalization_flag varchar(10)
+			
+);
+
+insert into silver.rnd_cost(
+		productid,
+		rnd_date,
+		costtype,
+		amount,
+		capitalization_flag
+		
+)
+
+select 
+
+productid,
+rnd_date,
+cost_type as costtype,
+amount,
+case when capitalization_flag  is null then 'Y'
+	 when capitalization_flag ='Y' then 'Y'
+	 else 'N'
+end as capitalization_flag
+
+
+from  bronze.rnd_costs
+
+
+
+---creating pp_e sturcture for table----
+--calculate oerating cost from asset depreciation
+drop table if exists Silver.pp_e
+
+create table Silver.pp_e(
+		assetclass varchar(20),
+		assetcost numeric(10,2),
+		purchasedate   date,
+		openingnbv numeric(10,2),
+		monthlydepreciatn numeric(10,2)
+
+);
+
+insert into Silver.pp_e(
+		assetclass,
+		assetcost,
+		purchasedate,
+		openingnbv,
+		monthlydepreciatn
+
+)
+
+
+select 
+asset_class as assetclass,
+cost_ as assetcost,
+purchase_date as purchasedate,
+opening_nbv as openingnbv,
+monthly_depreciation   as   monthlydepreciatn
+
+from bronze.pp_e
+where asset_class is not null
+
+
+
+--analysis for bronze.sgna----
+--add operating cost calculated from this to the product and research cost---
+--join pn the sgndate column ------ 
+drop table if exists Silver.sgn
+create table Silver.sgn(
+pk int,
+department varchar(20),
+sgndate date,
+plannedspend numeric(10,2),
+reschedulableflag varchar(10),
+recruitingcosts numeric(10,2),
+salesforcecost numeric(10,2)
+);
+
+insert into Silver.sgn(
+pk,
+department,
+sgndate,
+plannedspend,
+reschedulableflag,
+recruitingcosts,
+salesforcecost)
+
+select  
+row_number () over ( order by sgn_date) as pk,
+
+department,
+sgn_date as sgndate,
+planned_spend as plannedspend,
+reschedulable_flag as reschedulableflag,
+recruiting_costs as recruittingcost,
+salesforce_readiness_cost as salesforcecost
+
+from bronze.sgna
