@@ -1,0 +1,143 @@
+--checking for table availability---
+
+
+--creating new table--
+create schema Bronze;
+
+create schema Silver;
+
+create schema Gold;
+
+--using the bronze schema to import raw data without transformation---
+--first we create the tables in the bronze schema----
+Drop table if exists Bronze.Clinical_Regulatory_Events;
+create table  Bronze.Clinical_Regulatory_Events(
+		EventID varchar(20),
+		ProductID int,
+		EventDate date,
+		EventType varchar(50),
+		Cost_Impact numeric(10,2),
+		Expected_Additional_Timeline_Months  int,
+		Description varchar(200))
+;
+--creating the finance table structure--
+Drop table if exists Bronze.Financing_Schedule;
+create table  Bronze.Financing_Schedule(
+		FinancingID varchar(50),
+		finance_Date date,
+		Finance_month date,
+		Instrument varchar(50),
+		Amount numeric(10,2),
+		Drawdown_Date date,
+		Interest_Rate numeric(10,2),
+		Covenants varchar(50),
+		Maturity_Date date,
+		Fees  numeric(10,2),
+		Interest_Expense numeric(10,2)
+
+);
+
+--creating Manufacturing_Schedule structure--
+drop table if exists Manufacturing_Schedule;
+create table Bronze.Manufacturing_Schedule(
+		ScheduleID varchar(50),
+		ProductID integer,
+		Manu_Date date,
+		Planned_Batches  int,
+		Batch_Cost numeric(10,2),
+		Price_per_unit numeric(10,2),
+		Inventory_Buildup_Qty int,
+		Manufacturing_Readiness_Cost numeric(10,2),
+		Carrying_Cost_per_month numeric(10,2)
+
+);
+
+--creating PP&E Structure---
+drop table if exists Bronze.PP_E;
+create table Bronze.PP_E(
+		asset_class varchar(50),
+		Cost_ numeric(10,0),
+		Purchase_date date,
+		Depreciation_Rate numeric(10,2),
+		opening_NBV numeric(10,2),
+		Monthly_depreciation float
+
+);
+
+--creating Product_Master structure--
+drop table  if exists Bronze.Product_Master;
+create table Bronze.Product_Master(
+		ProductID int,
+		ProductName varchar(50),
+		Indication text,
+		Launch_Target_Date date,
+		Current_Regulatory_Status text,
+		Expected_Life_Years int,
+		Price_per_unit numeric(10,2),
+		Unit_of_Sale  text,
+		Gross_Margin_Target numeric(10,2),
+		MarketSegments text,
+		TherapeuticArea text
+
+);
+
+--creating Rnd_cost tabke structure--
+drop table if exists Bronze.Rnd_Costs;
+
+create table Bronze.Rnd_Costs(
+		CostID varchar(50),
+		ProductID int,
+		Rnd_Date date,
+		Cost_Type varchar(50),
+		Amount numeric(10,2),
+		Capitalization_Flag text,
+		Notes text
+);
+
+--creating table structure for Sales_Forecast_Baseline ---
+drop table  if exists Bronze.Sales_Forecast_Baseline;
+
+create table Bronze.Sales_Forecast_Baseline(
+
+		ForecastID varchar(50),
+		ProductID int,
+		RegionID int,
+		forecats_Date date,
+		Units_Sold_Baseline int,
+		Price_per_unit numeric(10,2),
+		Revenue_Baseline numeric(10,2),
+		Market_Share_Assumption numeric(10,2),
+		Penetration_Rate numeric(10,2),
+		Uptake_Curve_Label varchar(50)
+);
+
+--create structure for the Scenario_Adjustment table--
+drop table if exists Bronze.Scenario_Adjustment;
+
+create table Bronze.Scenario_Adjustment(
+		ScenarioID varchar(50),
+		ScenarioName varchar(50),
+		Launch_Date_Adjustment int,
+		Probability_of_Approval float,
+		Sales_Penalty_Factor float,
+		Marketing_Spend_Reschedule_Flag varchar(20),
+		Comments_ text);
+
+--create structure for the SGnA table--
+
+drop table if exists Bronze.SGnA;
+create table Bronze.SGnA(
+		SGnAID varchar(50),
+		Department text,
+		SGn_Date date,
+		Planned_Spend numeric(10,2),
+		Reschedulable_Flag varchar(50),
+		Marketing_Campaign_ID varchar(50),
+		Recruiting_Costs numeric(10,2),
+		Salesforce_Readiness_Cost numeric(10,2)
+);
+
+		
+
+
+		
