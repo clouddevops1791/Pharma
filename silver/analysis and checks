@@ -1,0 +1,77 @@
+--cost impact of lags towards each event-type to the company--
+-----(Wait waste) and (over-Processing)----
+select * from
+(select eventtype,expected_additional_timeline_months,
+	sum(cost_impact) as total_cost 
+from bronze.clinical_regulatory_events 
+group by eventtype,expected_additional_timeline_months
+order by total_cost desc
+)where expected_additional_timeline_months > 0;
+
+---cost of eventtype during clinical regulatory events---
+select * from(select eventtype,expected_additional_timeline_months,
+	sum(cost_impact) as total_cost 
+from bronze.clinical_regulatory_events 
+group by eventtype,expected_additional_timeline_months
+order by total_cost desc
+) where expected_additional_timeline_months = 0;
+
+--eventtype spread throughout the years---
+select  sum(cost_impact) as cost_,TO_CHAR(eventdate,'MM'),TO_CHAR(eventdate,'Mon')
+--row_number () over(partition by TO_CHAR(eventdate, 'MM') order by TO_CHAR(eventdate, 'MM') ) as permonthoccur
+
+from bronze.clinical_regulatory_events
+group by TO_CHAR(eventdate,'MM'),TO_CHAR(eventdate,'Mon')
+order by TO_CHAR(eventdate,'MM') asc
+--product master analysis---
+select * from bronze.product_master;
+
+--about finacialscheduling---
+--impact and regulatory causes--
+select * from bronze.financing_schedule;
+
+--about pp_e---
+select asset_class,cost_,purchase_date,depreciation_rate,opening_nbv,monthly_depreciation
+from  bronze.pp_e
+where asset_class is not null;
+
+-------clinical regulations------
+---effective cost of additional timeline to capital in relation to products--
+select * from (select productid,expected_additional_timeline_months,eventtype,
+sum(cost_impact) over (partition by expected_additional_timeline_months order by productid ) as delay_cost
+from bronze.clinical_regulatory_events
+group by productid,expected_additional_timeline_months,cost_impact,eventtype
+order by delay_cost desc) where expected_additional_timeline_months > 0;
+
+--total cost of production of the different products accounting for inventory waste and overproduction--
+--it also accounts for tied up capital making cash staic rather than flowing---
+--evaluating  on per unit basis--total  batches per products,total_inventory
+
+select productid,price_per_unit,sum(planned_batches) as planned_batches,
+sum(batch_cost) as batch_cost,sum(inventory_buildup_qty) as inventory_buildupQty,
+sum(carrying_cost_per_month) as carrying_cost,
+sum(manufacturing_readiness_cost) as manufacturing_cost,
+((sum(batch_cost))+(sum(carrying_cost_per_month))+(sum(manufacturing_readiness_cost) )) as
+producttotalcost
+
+from bronze.manufacturing_schedule
+group by productid,price_per_unit
+order by batch_cost desc;
+
+--rnd_costs analysis---
+select * from bronze.rnd_costs
+
+
+-----sales forecast analysis---
+select *  from  bronze.sales_forecast_baseline;
+
+---scenario adjustment analysis---
+select * from bronze.scenario_adjustment;
+
+---sgna analysis--
+select * from bronze.sgna;
+
+--question-what informs and decide the number of batches undertaken each month--some months did
+--10 batches,others 8,some 1 ..why the irregularity since  it isnt a pull production type
+
+
