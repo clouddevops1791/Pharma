@@ -1,0 +1,113 @@
+---joining productmaster and clinical regulatory to see the greater picture beetween them--
+select
+	row_number() over( order by cr.productid) as pk,
+	cr.productid as pdid,
+	pm.productname as pdname,
+	pm.indication as diseses,
+	cr.eventtype   as reg_event,
+	cr.expected_additional_timeline_months as eventlagtime,
+	
+	pm.therapeuticarea as therapy,
+	pm.unit_of_sale  as producttype,
+	pm.price_per_unit as sellingP,
+	pm.expected_life_years as shelflife,
+	pm.current_regulatory_status as status,
+	pm.launch_target_date as pdlaunchdate,
+	cr.eventdate as regulatorydate,
+	pm.marketsegments as mktsegment ,
+	cr.cost_impact as event_cost,
+	
+	pm.gross_margin_target as Grossmargintarget
+
+from  bronze.clinical_regulatory_events cr
+
+left Join  bronze.product_master pm ON cr.productid= pm.productid
+;
+ 
+----analysis of  manufacturing and sales prediction---------
+---creating a join with an aggregated manufacturing table and sales forecast table
+With Aggre_manu as
+	 (select 
+
+	ms.productid ,
+	ms.price_per_unit as manu_price,
+	
+	(ms.planned_batches) as plannedbatches,
+	(ms.batch_cost) as batchcost,
+	
+	(ms.inventory_buildup_qty) as inventory_buildup_qty,
+	(ms.manufacturing_readiness_cost) as manu_readiness_cost,
+	(ms.carrying_cost_per_month) as carrying_cost_monthly
+	
+
+from bronze.manufacturing_schedule ms
+group  by ms.productid,ms.price_per_unit,(ms.planned_batches),(ms.batch_cost),(ms.inventory_buildup_qty),(ms.manufacturing_readiness_cost),
+(ms.carrying_cost_per_month))
+
+select
+
+	sb.productid,
+	ms.manu_date,
+	row_number() over(partition by sb.forecats_date  order by sb.productid  ) as  measure,
+
+	sb.revenue_baseline,
+	
+	sb.forecats_date,
+	sb.units_sold_baseline,
+	sb.price_per_unit,
+	sb.market_share_assumption,
+	sb.penetration_rate,
+	
+
+	(ms.planned_batches) as planned_batches,
+	(ms.batch_cost) as batch_cost,
+	
+	(ms.inventory_buildup_qty) as inventory_qty,
+	(ms.manufacturing_readiness_cost) as manu_readiness_cost,
+	(ms.carrying_cost_per_month) as carry_cost_per_month
+	
+
+
+from bronze.manufacturing_schedule ms	
+left join  bronze.sales_forecast_baseline sb on ms.productid=sb.productid
+where (sb.forecats_date-ms.manu_date) <90 and (sb.forecats_date > ms.manu_date)
+group by sb.revenue_baseline,sb.productid	,
+	ms.manu_date,
+	sb.forecats_date,
+	sb.units_sold_baseline,(ms.planned_batches),(ms.batch_cost),(ms.inventory_buildup_qty),(ms.manufacturing_readiness_cost),
+(ms.carrying_cost_per_month),
+	
+	sb.price_per_unit,
+	sb.market_share_assumption,
+	sb.penetration_rate
+
+order by productid,ms.manu_date asc
+	
+----------analysis for 	
+
+select 
+		scenarioid,
+		scenarioname,
+		launch_date_adjustment,
+		probability_of_approval,
+		sales_penalty_factor,
+		case when marketing_spend_reschedule_flag='0' then 'Y'
+		else  'N'
+		end as marketing_spend_reschedule_flag
+		
+from bronze.scenario_adjustment ;
+
+---financingschedule
+--cleaning these tables before passing them to the silver schema tables
+select
+			financingid ,
+			finance_date ,
+			instrument ,
+			amount ,
+			drawdown_date,
+			interest_rate ,
+			maturity_date ,
+			fees ,
+			interest_expense 
+
+from bronze.financing_schedule
