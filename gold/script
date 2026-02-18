@@ -1,0 +1,84 @@
+drop table if exists Gold.productcycle;
+create table Gold.productcycle(
+pdname varchar(20),
+diseses varchar(20),
+eventtype varchar(100),
+totalagtime int,
+therapy varchar(20),
+producttype  varchar(20),
+sellingp numeric(10,2),
+shelfline int,
+status varchar(20),
+prdstartdate date,
+lastregulatorydate date,
+mktsegment varchar(50),
+eventcost numeric(10,2),
+grossmargintarget numeric(10,2))
+;
+
+                                    --inserting into gold table---
+
+insert into Gold.productcycle(
+pdname ,
+diseses ,
+eventtype ,
+totalagtime ,therapy ,producttype ,sellingp ,shelfline ,status ,prdstartdate,lastregulatorydate ,mktsegment ,eventcost ,grossmargintarget 
+
+)
+
+
+select 
+
+pdname,
+diseses,
+STRING_AGG(distinct reg_event, ',') as eventtypes,
+SUM(eventlagtime) as totalagtime,
+therapy,
+producttype,
+sellingp,
+shelflife,
+status,
+min(pdlaunchdate) as prdstartdate,
+max(regulatorydate) as lastregulatorydate,
+mktsegment,
+sum(event_cost) as eventcost,
+grossmargintarget
+
+from silver.productcycle
+
+group by pdid,pdname,diseses,therapy,producttype,sellingp,shelflife,status,mktsegment,grossmargintarget
+
+                    
+                    ----Businesslogic for manufacturing dataset--
+
+
+select * from silver.manufacturingdata
+
+            ---manufacturing analysis-----
+
+
+with mst as (select  productid,manu_date,max(inventory_qty) as inventory,sum(units_sold_baseline) as monthlydemand
+from silver.manufacturingdata
+group by productid,manu_date
+)
+select 
+	productid,
+	regionid,
+	manu_date,
+	
+	sum(inventoryqty- units_soldbaseline) over (partition by productid order by manu_date rows between unbounded preceding
+	and current  row) as carryoverstock 
+from
+
+(select 
+	productid,
+	regionid,
+	manu_date,
+	max(inventory_qty) as inventoryqty,
+	sum(units_sold_baseline) as units_soldbaseline
+from silver.manufacturingdata
+group by productid,regionid ,manu_date 
+)
+
+
+	
